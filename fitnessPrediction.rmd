@@ -1,0 +1,66 @@
+---
+title: "FItness activity prediction"
+author: "J.L. van der Plas"
+date: "12 November 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+```
+
+## Executive summary
+
+We analyzed a data set of fitness devices to see if we can predict if barbells were lifted in a correct way or not. We used random tree model to train and achieved an expected out of sample error of 0.7%. The data was cross-validated by splitting the data in a training set (75%) and a testing set (25%).
+
+## Introduction
+
+In an experiment participants made barbell-lifts in correct and incorrect ways. Because the participants wore fitness devices, it is possible to predict the type of lift by looking at the movements that were measured.  We downloaded the measurement (the data is available http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har) and tried to predict the type of lift.
+
+``` {r load data}
+testing_all <- read.csv("pml-testing.csv")
+training_all <- read.csv("pml-training.csv")
+```
+
+## Data preparation
+
+The original data contains 19622 observations with 160 variables. Some of the variables were unlikely to be useful in prediction, such as the name of the participant and time-stamp. The were also a some measurement were most of the rows contained no data (NA). These columns were removed from the training data. This left 53 variables in the data set. Next the data was split in a training and testing set (75% - 25% of the data respectively). Because the size of the data set we did not think that boosting was necessary.  
+
+``` {r data preparation}
+usedColumns <- c("roll_belt","pitch_belt","yaw_belt","total_accel_belt", "gyros_belt_x", "gyros_belt_y", "gyros_belt_z", "accel_belt_x", "accel_belt_y","accel_belt_z","magnet_belt_x","magnet_belt_y", "magnet_belt_z", "roll_arm","pitch_arm",  "yaw_arm", "total_accel_arm", "gyros_arm_y", "gyros_arm_z", "accel_arm_x", "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z",  "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "total_accel_dumbbell",  "gyros_dumbbell_x", "gyros_dumbbell_y",  "gyros_dumbbell_z", "accel_dumbbell_x", "accel_dumbbell_y",  "accel_dumbbell_z", "magnet_dumbbell_x",  "magnet_dumbbell_y", "magnet_dumbbell_z",  "roll_forearm", "pitch_forearm", "yaw_forearm",  "total_accel_forearm", "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z", "accel_forearm_x", "accel_forearm_y", "accel_forearm_z", "magnet_forearm_x", "magnet_forearm_y", "magnet_forearm_z", "classe")
+training <- training_all[,usedColumns]
+trainIndex <- createDataPartition(training_all$classe, p=0.75, list=FALSE)
+trainIndexSmall <- createDataPartition(training_all$classe, p=0.01, list=FALSE)
+dataTrain <- training[trainIndex,]
+dataTest <- training[-trainIndex,]
+dataTrainSmall <- training[trainIndexSmall,]
+
+```
+
+
+## Data exploration
+
+We made some featurePlots to see if there were any distinctive patterns. The patterns in the feature plot was not distinctive enough for us to give any measurements special treatment and we decided to keep all measurements in the data. (The plot were made with a smaller data set in order to keep the number of points in the plot manageable.)
+``` {r data exploration}
+
+library(AppliedPredictiveModeling)
+transparentTheme(trans = .4)
+featurePlot(x=dataTrainSmall[,c("total_accel_belt","total_accel_arm","total_accel_dumbbell","total_accel_forearm")], y=dataTrainSmall$classe, plot="pairs", auto.key = list(columns = 5))
+featurePlot(x=dataTrainSmall[,c("roll_belt","pitch_belt","yaw_belt")], y=dataTrainSmall$classe, plot="pairs", auto.key = list(columns = 5))
+```
+
+## Model selection and evaluation
+
+We decided to the random forest method to fit the model because it can classify more than 2 different outcomes and generally gives good performance. One issue its that data set is somewhat large, and the training took more than one hour. However, when the model was validated against the test data, an accuracy of 99.3% was achieved. 
+
+``` {r model fit}
+model_rf <- train(classe ~ ., data = dataTrain, method= "parRF")
+pred <- predict(model_rf, dataTest)
+confusionMatrix(pred, dataTest$classe)
+```
+
+## Conclusion
+
+The model created by the random forest method gives a good predictor for the type of barbell fits, with an expected accuracy of 99.3%
+
